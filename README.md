@@ -2,9 +2,10 @@
 
 This repository holds scripts for Figure 1 of [Wouters et al., 2024]().
 
-![Figure 1 A](out_plots/lineage_freq.jpeg)
+<img src="out_plots/lineage_freq.jpeg" width="300">
 
-![Figure 1 B](out_plots/ha_tree.png)
+<img src="out_plots/ha_tree.png" alt="Figure 1 B" width="300">
+
 
 ## Methods
 
