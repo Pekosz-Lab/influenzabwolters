@@ -1,0 +1,228 @@
+---
+title: "tree_plots"
+author: Elgin Akin
+date: 2024-05-07
+format: html
+---
+
+Time resolved trees were constructed using scripts in the `02_tree_build.ipynb` notebook.
+
+# global 
+```{r}
+library(tidyverse)
+library(ggtree)
+library(treeio)
+library(ggtreeExtra)
+library(ape)
+
+theme_set(theme_minimal(base_family = "garamond"))
+
+# Define corresponding colors for each clade
+clade_colors <- c( # yamagata 
+                  "Y3" = "#FF5800", 
+                  "Y2" = "#feb47b", 
+                  "Y1" = "#f5abb9",
+  #victoria clade colors
+                  "V1A" = "#1f77b4", 
+                  "V1A.1" = "#003A59", 
+                  "V1A.2" = "#2B4279", 
+                  "V1A.3" = "#65428C", 
+                  "V1A.3a" = "#A1378B",
+                  "V1A.3a.1" = "#D42374", 
+                  "V1A.3a.2" = "#F62B4C"
+                 )
+
+lineage_colors <- c("victoria"="#54bebe",
+                    "yamagata"="#c80064")
+```
+
+# Import data
+
+```{r}
+metadata <- read_tsv('../results/cat/ha_filtered.tsv') %>% select(-date)
+timetree <- read.beast('../results/cat/ha_treetime/timetree.nexus') #part of treeio
+
+timetree <- timetree %>% as_data_frame() #underscores are a treeio function, not the base
+
+timetree_ann <- left_join(timetree, metadata, by=c("label"="strain"))
+
+timetree_ann <- timetree_ann %>% as.treedata()
+
+```
+
+Node IDs 
+```{r}
+plotly::ggplotly(node_label)
+```
+
+
+node keys: 
+
+- Victoria: node 1047
+- Yamagata: Node 871 
+- Vic like - node 266
+- Yam like - node 2
+- B/Lee/40 - node 1
+
+
+# Plot Trees
+
+add grey lines
+```{r}
+labsize <- 5
+num_offset <- 2
+
+timetree_ann_p <- ggtree(timetree_ann, mrsd = '2023-07-23', right = TRUE) +
+  geom_tippoint(aes(color = clade, shape = lineage), size = 1.5, alpha = 0.99) + 
+  scale_color_manual(values = clade_colors) +
+  xlab("Time") +
+  guides(color = guide_legend(title = "Clade", ncol = 3),
+         shape = guide_legend(title = "Lineage", ncol = 2,
+                              direction = "vertical", 
+                              keyheight = unit(1, "lines"), 
+                              keywidth = unit(1, "lines"))) +
+  theme_tree2(legend.position = c(0.38, 0.3), 
+              axis.text.x = element_text(size = 7),
+              legend.text = element_text(size = 6), 
+              legend.spacing.x = unit(0.01, "cm"),
+              legend.key.height = unit(0.3, "cm"),
+              legend.background = element_rect(fill = "transparent")) + # Set the size of x-axis text to 7
+  scale_x_continuous(breaks = seq(1940, 2023, by = 20), labels = seq(1940, 2023, by = 20)) +
+  geom_vline(xintercept = seq(1940, 2023, by = 10), linetype = "dotted", color = "gray") # Add vertical dotted lines
+
+timetree_ann_p
+
+ggsave('../out_plots/ha_tree.png', timetree_ann_p, height = 4, width = 2.5, dpi = 600)
+```
+## Test point outline: 
+
+```{r}
+labsize <- 5
+num_offset <- 2
+
+timetree_ann_p_2 <- ggtree(timetree_ann, mrsd = '2023-07-23', right = TRUE) +
+  geom_tippoint(aes(fill = factor(clade)),
+                shape = 21, 
+                color = "black",
+                size = 1.5, 
+                alpha = 0.80,
+                stroke = 0.3) +
+  scale_fill_manual(values = clade_colors) +
+  xlab("Time") +
+  guides(fill = guide_legend(title = "Clade", ncol = 1, )) +
+  theme_tree2(legend.position = c(0.38, 0.3), 
+              axis.text.x = element_text(size = 7),
+              legend.text = element_text(size = 6), 
+              legend.spacing.x = unit(0.01, "cm"),
+              legend.key.height = unit(0.3, "cm"),
+              legend.background = element_rect(fill = "transparent")) + # Set the size of x-axis text to 7
+  scale_x_continuous(breaks = seq(1940, 2023, by = 20), labels = seq(1940, 2023, by = 20)) +
+  geom_vline(xintercept = seq(1940, 2023, by = 10), linetype = "dotted", color = "gray") # Add vertical dotted lines
+timetree_ann_p_2
+
+ggsave('../out_plots/ha_tree_2.png', timetree_ann_p_2, height = 4, width = 2.5, dpi = 600)
+```
+
+# lineage frequencies summarized by month
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Read the data from the TSV file
+data <- read_tsv('../results/cat/ha_metadata.tsv')
+
+# Convert 'date' column to Date format
+data$date <- as.Date(data$date)
+
+# Filter the data to include only dates between 2015 and 2023
+data <- data[data$date >= as.Date("2015-01-01") & data$date <= as.Date("2023-12-31"), ]
+
+# Summarize counts by month and lineage
+lineage_counts <- data %>% 
+  mutate(month = format(date, "%Y-%m")) %>% 
+  count(month, lineage) %>% 
+  spread(lineage, n, fill = 0)
+
+# Melt
+lineage_counts_long <- tidyr::pivot_longer(lineage_counts, cols = -month, names_to = "lineage", values_to = "count")
+
+# Get the maximum date for each lineage
+max_dates <- lineage_counts_long %>%
+  group_by(lineage) %>%
+  summarize(max_date = max(as.Date(paste0(month, "-01"))))
+
+# plot
+lineage_freq_p <- ggplot(lineage_counts_long, aes(x = as.Date(paste0(month, "-01")), y = count, fill = lineage)) +
+  geom_area() +
+  geom_line(data = max_dates, aes(x = max_date, y = 0, group = lineage), linetype = "dotted", size = 0.5) +  # Add dotted lines
+  geom_vline(data = data.frame(year = 2015:2023), aes(xintercept = as.Date(paste0(year, "-01-01"))), color = "grey", linetype = "dotted", size = 0.5) + # Add vertical lines for each year
+  labs(x = "Year", y = "Total Number of Sequences") +
+  scale_fill_manual(values = lineage_colors) +
+  theme_bw() +  # Set white background
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        panel.background = element_rect(fill = "white"),  # Set background color
+        panel.border = element_blank(),
+        legend.direction = "vertical", 
+        legend.position = c(0.8, 0.75),
+        legend.background = element_rect(fill = "transparent"),
+        axis.text.x = element_text(size = 13)) + # Remove plot border
+        scale_x_date(date_breaks = "1 year", date_labels = "%Y") 
+   guides(fill = guide_legend(title.position = "top", title.hjust = 0.5))
+
+lineage_freq_p
+
+ggsave('../out_plots/lineage_freq.jpeg', lineage_freq_p, height = 3, width = 9, dpi = 600)
+
+```
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Read the data from the TSV file
+data <- read_tsv('../results/cat/ha_metadata.tsv')
+
+# Convert 'date' column to Date format
+data$date <- as.Date(data$date)
+
+# Filter the data to include only dates between 2015 and 2023
+data <- data[data$date >= as.Date("2015-01-01") & data$date <= as.Date("2023-12-31"), ]
+
+# Summarize counts by month and clade
+clade_counts <- data %>% 
+  mutate(month = format(date, "%Y-%m")) %>% 
+  count(month, clade) %>% 
+  spread(clade, n, fill = 0)
+
+# Melt
+clade_counts_long <- tidyr::pivot_longer(clade_counts, cols = -month, names_to = "clade", values_to = "count")
+
+# Get the maximum date for each clade
+max_dates <- clade_counts_long %>%
+  group_by(clade) %>%
+  summarize(max_date = max(as.Date(paste0(month, "-01"))))
+
+# Plot the data
+clade_freq_p <- ggplot(clade_counts_long, aes(x = as.Date(paste0(month, "-01")), y = count, fill = clade)) +
+  geom_area() +
+  geom_line(data = max_dates, aes(x = max_date, y = 0, group = clade), linetype = "dotted", size = 0.5) +  # Add dotted lines
+  geom_vline(data = data.frame(year = 2015:2023), aes(xintercept = as.Date(paste0(year, "-01-01"))), color = "grey", linetype = "dotted", size = 0.5) + # Add vertical lines for each year
+  labs(x = "Year", y = "Total GISAID Sequences") +
+  scale_fill_manual(values = clade_colors) +
+  theme_bw() +  # Set white background
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        panel.background = element_rect(fill = "white"),  # Set background color
+        panel.border = element_blank()) + # Remove plot border
+        scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+
+clade_freq_p 
+
+ggsave('../out_plots/clade_freq.jpeg', clade_freq_p, height = 3, width = 6, dpi=300)
+```

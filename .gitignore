@@ -1,0 +1,13 @@
+# sensitive data
+data/
+results/
+
+# misc config
+*.vdoc*
+.Rproj*
+*.RData
+.Rhistory
+
+
+#
+*DS_Store
